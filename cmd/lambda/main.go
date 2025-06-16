@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"strings"
 
 	"github.com/PhilNel/go-boardgame-assistant/internal/config"
 	"github.com/PhilNel/go-boardgame-assistant/internal/provider"
@@ -11,63 +13,120 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
+type Request struct {
+	GameName string `json:"gameName"`
+	Question string `json:"question"`
+}
+
 type Response struct {
-	Message string   `json:"message"`
-	Folders []string `json:"folders"`
+	Answer string `json:"answer"`
+	Error  string `json:"error,omitempty"`
 }
 
 var (
-	cfg        *config.Config
-	s3Provider *provider.S3Provider
+	s3Provider      *provider.S3Provider
+	bedrockProvider *provider.BedrockProvider
 )
 
 func init() {
-	cfg = config.Load()
+	log.Printf("Starting Lambda initialization")
 
-	var err error
+	// Initialize S3 provider
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+	log.Printf("Loaded config: %+v", cfg)
+
 	s3Provider, err = provider.NewS3Provider(cfg.S3)
 	if err != nil {
 		log.Fatalf("Failed to initialize S3 provider: %v", err)
 	}
+	log.Printf("S3 provider initialized successfully")
+
+	bedrockProvider, err = provider.NewBedrockProvider(cfg.Bedrock)
+	if err != nil {
+		log.Fatalf("Failed to initialize Bedrock provider: %v", err)
+	}
+	log.Printf("Bedrock provider initialized successfully")
 }
 
-func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	log.Printf("Processing request data for request %s", request.RequestContext.RequestID)
+func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	var req Request
+	if err := json.Unmarshal([]byte(request.Body), &req); err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       fmt.Sprintf(`{"error": "Invalid request format: %v"}`, err),
+		}, nil
+	}
 
-	// List folders
-	folders, err := s3Provider.ListFolders(ctx)
+	if req.GameName == "" || req.Question == "" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       `{"error": "gameName and question are required"}`,
+		}, nil
+	}
+
+	// Get all game rules files from S3
+	folder := strings.ToLower(req.GameName)
+	files, err := s3Provider.ListFilesInFolder(ctx, folder)
 	if err != nil {
-		log.Printf("Failed to list folders: %v", err)
+		log.Printf("Failed to list files in folder: %v", err)
 		return events.APIGatewayProxyResponse{
 			StatusCode: 500,
-			Body:       "Failed to list S3 folders",
-		}, err
+			Body:       `{"error": "Failed to list game rule files"}`,
+		}, nil
+	}
+
+	var combinedRules strings.Builder
+	for _, file := range files {
+		if strings.HasSuffix(file, ".txt") {
+			content, err := s3Provider.GetObject(ctx, file)
+			if err != nil {
+				log.Printf("Failed to get file %s: %v", file, err)
+				continue
+			}
+			combinedRules.WriteString(string(content))
+			combinedRules.WriteString("\n\n")
+		}
+	}
+
+	if combinedRules.Len() == 0 {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 404,
+			Body:       `{"error": "No game rule files found"}`,
+		}, nil
+	}
+
+	// Generate response using Bedrock
+	answer, err := bedrockProvider.GenerateResponse(ctx, combinedRules.String(), req.Question)
+	if err != nil {
+		log.Printf("Failed to generate response: %v", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Body:       `{"error": "Failed to generate response"}`,
+		}, nil
 	}
 
 	response := Response{
-		Message: "Successfully listed S3 folders",
-		Folders: folders,
+		Answer: answer,
 	}
 
 	responseBody, err := json.Marshal(response)
 	if err != nil {
+		log.Printf("Failed to marshal response: %v", err)
 		return events.APIGatewayProxyResponse{
 			StatusCode: 500,
-			Body:       "Internal Server Error",
-		}, err
+			Body:       `{"error": "Failed to process response"}`,
+		}, nil
 	}
 
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
-		Headers: map[string]string{
-			"Content-Type":                     "application/json",
-			"Access-Control-Allow-Origin":      "*",
-			"Access-Control-Allow-Credentials": "true",
-		},
-		Body: string(responseBody),
+		Body:       string(responseBody),
 	}, nil
 }
 
 func main() {
-	lambda.Start(handler)
+	lambda.Start(handleRequest)
 }
