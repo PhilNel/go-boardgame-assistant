@@ -13,7 +13,8 @@ type Config struct {
 }
 
 type Bedrock struct {
-	Region string `long:"aws_region_bedrock" env:"AWS_REGION" description:"AWS region to use" default:"us-east-1"`
+	ModelID string `long:"bedrock_model_id" env:"BEDROCK_MODEL_ID" description:"Bedrock model ID to use" default:"anthropic.claude-3-haiku-20240307-v1:0"`
+	Region  string `long:"aws_region_bedrock" env:"AWS_REGION" description:"AWS region to use" default:"us-east-1"`
 }
 
 type Log struct {

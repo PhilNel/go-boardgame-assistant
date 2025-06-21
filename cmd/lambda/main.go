@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/PhilNel/go-boardgame-assistant/internal/config"
+	"github.com/PhilNel/go-boardgame-assistant/internal/logger"
 	"github.com/PhilNel/go-boardgame-assistant/internal/provider"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -31,7 +32,6 @@ var (
 func init() {
 	log.Printf("Starting Lambda initialization")
 
-	// Initialize S3 provider
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
@@ -67,6 +67,8 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		}, nil
 	}
 
+	logger.LogIncomingRequest(req.GameName, req.Question)
+
 	// Get all game rules files from S3
 	folder := strings.ToLower(req.GameName)
 	files, err := s3Provider.ListFilesInFolder(ctx, folder)
@@ -78,9 +80,12 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		}, nil
 	}
 
+	log.Printf("Retrieved %d files from S3 folder '%s': %v", len(files), folder, files)
+
 	var combinedRules strings.Builder
 	for _, file := range files {
-		if strings.HasSuffix(file, ".txt") {
+		if strings.HasSuffix(file, ".txt") || strings.HasSuffix(file, ".md") {
+			log.Printf("Processing file: %s", file)
 			content, err := s3Provider.GetObject(ctx, file)
 			if err != nil {
 				log.Printf("Failed to get file %s: %v", file, err)
@@ -88,6 +93,8 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 			}
 			combinedRules.WriteString(string(content))
 			combinedRules.WriteString("\n\n")
+		} else {
+			log.Printf("Skipping file (unsupported extension): %s", file)
 		}
 	}
 
@@ -107,6 +114,8 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 			Body:       `{"error": "Failed to generate response"}`,
 		}, nil
 	}
+
+	logger.LogSuccessfulQAPair(req.GameName, req.Question, answer)
 
 	response := Response{
 		Answer: answer,

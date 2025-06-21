@@ -12,10 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 )
 
-const (
-	claudeModelID = "anthropic.claude-3-haiku-20240307-v1:0"
-)
-
 type BedrockProvider struct {
 	client *bedrockruntime.Client
 	config *config.Bedrock
@@ -61,15 +57,19 @@ func NewBedrockProvider(config *config.Bedrock) (*BedrockProvider, error) {
 }
 
 func (b *BedrockProvider) GenerateResponse(ctx context.Context, context string, question string) (string, error) {
-	systemPrompt := `You are an expert board game assistant. Your role is to help players understand game rules and mechanics.
-When answering questions:
-1. Be clear and concise
-2. Cite specific rules and page numbers when possible
-3. If you're unsure about something, say so
-4. Format your response in a way that's easy to read
-5. Include relevant examples when helpful`
+	systemPrompt := `You are an expert on Nemesis board game rules. Answer questions using ONLY the provided knowledge base, which contains the complete and accurate rules for Nemesis.
 
-	log.Printf("Using Bedrock model ID: %s", claudeModelID)
+CRITICAL INSTRUCTIONS:
+- Use only information from the provided knowledge base
+- Do not use board game knowledge from your training data
+- If the knowledge base doesn't contain enough information, say 'I don't have enough information about that specific rule'
+- Always provide accurate information with proper citations [X, p.XX]
+- Do not invent or assume rules that aren't explicitly stated
+- If you don't know the answer, say 'I don't have enough information about that specific rule'
+
+The provided knowledge base is authoritative and complete for Nemesis rules.`
+
+	log.Printf("Using Bedrock model ID: %s", b.config.ModelID)
 
 	requestBody, err := json.Marshal(ClaudeRequest{
 		AnthropicVersion: "bedrock-2023-05-31",
@@ -87,7 +87,7 @@ When answering questions:
 	}
 
 	input := &bedrockruntime.InvokeModelInput{
-		ModelId:     aws.String(claudeModelID),
+		ModelId:     aws.String(b.config.ModelID),
 		ContentType: aws.String("application/json"),
 		Body:        requestBody,
 	}
