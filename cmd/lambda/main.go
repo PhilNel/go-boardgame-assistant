@@ -2,72 +2,51 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 
+	"github.com/PhilNel/go-boardgame-assistant/internal/answer"
 	"github.com/PhilNel/go-boardgame-assistant/internal/config"
-	"github.com/PhilNel/go-boardgame-assistant/internal/provider"
+	"github.com/PhilNel/go-boardgame-assistant/internal/handler"
+	"github.com/PhilNel/go-boardgame-assistant/internal/knowledge"
+	"github.com/PhilNel/go-boardgame-assistant/internal/prompt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-type Response struct {
-	Message string   `json:"message"`
-	Folders []string `json:"folders"`
-}
-
-var (
-	cfg        *config.Config
-	s3Provider *provider.S3Provider
-)
+var questionHandler *handler.QuestionHandler
 
 func init() {
-	cfg = config.Load()
+	log.Printf("Starting Lambda initialization")
 
-	var err error
-	s3Provider, err = provider.NewS3Provider(cfg.S3)
+	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to initialize S3 provider: %v", err)
+		log.Fatalf("Failed to load config: %v", err)
 	}
+	log.Printf("Loaded config: %+v", cfg)
+
+	knowledgeProvider, err := knowledge.NewS3Provider(cfg.S3)
+	if err != nil {
+		log.Fatalf("Failed to initialize knowledge provider: %v", err)
+	}
+	log.Printf("Knowledge provider initialized successfully")
+
+	templateProvider := prompt.NewStaticTemplate()
+	log.Printf("Template provider initialized successfully")
+
+	answerProvider, err := answer.NewBedrockProvider(cfg.Bedrock, templateProvider)
+	if err != nil {
+		log.Fatalf("Failed to initialize answer provider: %v", err)
+	}
+	log.Printf("Answer provider initialized successfully")
+
+	questionHandler = handler.NewQuestionHandler(knowledgeProvider, answerProvider)
+	log.Printf("Question handler initialized successfully")
 }
 
-func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	log.Printf("Processing request data for request %s", request.RequestContext.RequestID)
-
-	// List folders
-	folders, err := s3Provider.ListFolders(ctx)
-	if err != nil {
-		log.Printf("Failed to list folders: %v", err)
-		return events.APIGatewayProxyResponse{
-			StatusCode: 500,
-			Body:       "Failed to list S3 folders",
-		}, err
-	}
-
-	response := Response{
-		Message: "Successfully listed S3 folders",
-		Folders: folders,
-	}
-
-	responseBody, err := json.Marshal(response)
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 500,
-			Body:       "Internal Server Error",
-		}, err
-	}
-
-	return events.APIGatewayProxyResponse{
-		StatusCode: 200,
-		Headers: map[string]string{
-			"Content-Type":                     "application/json",
-			"Access-Control-Allow-Origin":      "*",
-			"Access-Control-Allow-Credentials": "true",
-		},
-		Body: string(responseBody),
-	}, nil
+func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	return questionHandler.Handle(ctx, request)
 }
 
 func main() {
-	lambda.Start(handler)
+	lambda.Start(handleRequest)
 }
