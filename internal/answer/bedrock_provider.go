@@ -38,6 +38,7 @@ func (b *BedrockProvider) GenerateAnswer(ctx context.Context, request *types.Ans
 	userContent := fmt.Sprintf("%s\n\nGame Context:\n%s\n\nQuestion: %s", systemPrompt, request.Knowledge, request.Question)
 
 	log.Printf("Using Bedrock model ID: %s for game: %s", b.bedrockClient.GetModelID(), request.GameName)
+	log.Printf("Request context: Knowledge length=%d, Question length=%d", len(request.Knowledge), len(request.Question))
 
 	bedrockRequest := &types.BedrockRequest{
 		AnthropicVersion: "bedrock-2023-05-31",
@@ -53,10 +54,19 @@ func (b *BedrockProvider) GenerateAnswer(ctx context.Context, request *types.Ans
 
 	response, err := b.bedrockClient.InvokeModel(ctx, bedrockRequest)
 	if err != nil {
+		log.Printf("ERROR: Bedrock InvokeModel failed: %v", err)
 		return "", fmt.Errorf("failed to invoke model: %w", err)
 	}
 
-	return b.extractTextFromResponse(response)
+	log.Printf("Bedrock InvokeModel succeeded, extracting response...")
+	answer, err := b.extractTextFromResponse(response)
+	if err != nil {
+		log.Printf("ERROR: Failed to extract text from response: %v", err)
+		return "", err
+	}
+
+	log.Printf("Successfully extracted answer with length: %d", len(answer))
+	return answer, nil
 }
 
 func (b *BedrockProvider) extractTextFromResponse(response *types.BedrockResponse) (string, error) {

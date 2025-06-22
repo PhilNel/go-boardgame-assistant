@@ -9,6 +9,7 @@ import (
 	"github.com/PhilNel/go-boardgame-assistant/internal/handler"
 	"github.com/PhilNel/go-boardgame-assistant/internal/knowledge"
 	"github.com/PhilNel/go-boardgame-assistant/internal/prompt"
+	"github.com/PhilNel/go-boardgame-assistant/internal/utils"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
@@ -44,7 +45,21 @@ func init() {
 }
 
 func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	return questionHandler.Handle(ctx, request)
+	// Add panic recovery
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("PANIC: Lambda handler panicked: %v", r)
+		}
+	}()
+
+	response, err := questionHandler.Handle(ctx, request)
+	if err != nil {
+		log.Printf("ERROR: Handler returned error: %v", err)
+		return utils.CreateErrorResponse(500, "Internal server error"), nil
+	}
+
+	log.Printf("Handler completed successfully with status: %d", response.StatusCode)
+	return response, nil
 }
 
 func main() {
