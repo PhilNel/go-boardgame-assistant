@@ -3,8 +3,10 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	"github.com/PhilNel/go-boardgame-assistant/internal/knowledge"
 	"github.com/PhilNel/go-boardgame-assistant/internal/logger"
 	"github.com/PhilNel/go-boardgame-assistant/internal/types"
 	"github.com/PhilNel/go-boardgame-assistant/internal/utils"
@@ -22,7 +24,7 @@ type Response struct {
 }
 
 type KnowledgeProvider interface {
-	GetKnowledge(ctx context.Context, gameName string) (string, error)
+	GetKnowledge(ctx context.Context, gameName string, query string) (string, error)
 }
 
 type AnswerProvider interface {
@@ -82,14 +84,22 @@ func (h *QuestionHandler) validateRequest(req *Request) error {
 func (h *QuestionHandler) processQuestion(ctx context.Context, req *Request) (string, error) {
 	logger.LogIncomingRequest(req.GameName, req.Question)
 
-	knowledge, err := h.knowledgeProvider.GetKnowledge(ctx, req.GameName)
+	knowledgeContent, err := h.knowledgeProvider.GetKnowledge(ctx, req.GameName, req.Question)
 	if err != nil {
+		// Check if this is a "no relevant knowledge" error
+		var noKnowledgeErr *knowledge.NoRelevantKnowledgeError
+		if errors.As(err, &noKnowledgeErr) {
+			// Return a helpful message instead of an error
+			return "I don't have any specific information about that topic in my knowledge base for " + req.GameName +
+				". This might be something we haven't covered yet, or your question might need to be more specific. " +
+				"Feel free to try rephrasing your question or asking about a different aspect of the game!", nil
+		}
 		return "", fmt.Errorf("failed to retrieve game knowledge: %w", err)
 	}
 
 	answerRequest := &types.AnswerRequest{
 		GameName:  req.GameName,
-		Knowledge: knowledge,
+		Knowledge: knowledgeContent,
 		Question:  req.Question,
 	}
 

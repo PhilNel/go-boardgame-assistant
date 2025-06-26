@@ -40,9 +40,9 @@ func (b *BedrockProvider) GenerateAnswer(ctx context.Context, request *types.Ans
 	log.Printf("Using Bedrock model ID: %s for game: %s", b.bedrockClient.GetModelID(), request.GameName)
 	log.Printf("Request context: Knowledge length=%d, Question length=%d", len(request.Knowledge), len(request.Question))
 
-	bedrockRequest := &types.BedrockRequest{
+	bedrockRequest := &aws.BedrockRequest{
 		AnthropicVersion: "bedrock-2023-05-31",
-		Messages: []types.BedrockMessage{
+		Messages: []aws.BedrockMessage{
 			{
 				Role:    "user",
 				Content: userContent,
@@ -69,7 +69,7 @@ func (b *BedrockProvider) GenerateAnswer(ctx context.Context, request *types.Ans
 	return answer, nil
 }
 
-func (b *BedrockProvider) extractTextFromResponse(response *types.BedrockResponse) (string, error) {
+func (b *BedrockProvider) extractTextFromResponse(response *aws.BedrockResponse) (string, error) {
 	if len(response.Content) == 0 {
 		return "", fmt.Errorf("empty response from model")
 	}
