@@ -20,9 +20,12 @@ type System struct {
 }
 
 type Bedrock struct {
-	ModelID          string `long:"bedrock_model_id" env:"BEDROCK_MODEL_ID" description:"Bedrock model ID to use" default:"anthropic.claude-3-haiku-20240307-v1:0"`
-	EmbeddingModelID string `long:"bedrock_embedding_model_id" env:"BEDROCK_EMBEDDING_MODEL_ID" description:"Bedrock embedding model ID" default:"amazon.titan-embed-text-v2:0"`
-	Region           string `long:"aws_region_bedrock" env:"AWS_REGION" description:"AWS region to use" default:"eu-west-1"`
+	ModelID           string  `long:"bedrock_model_id" env:"BEDROCK_MODEL_ID" description:"Bedrock model ID to use" default:"anthropic.claude-3-haiku-20240307-v1:0"`
+	EmbeddingModelID  string  `long:"bedrock_embedding_model_id" env:"BEDROCK_EMBEDDING_MODEL_ID" description:"Bedrock embedding model ID" default:"amazon.titan-embed-text-v2:0"`
+	Region            string  `long:"aws_region_bedrock" env:"AWS_REGION" description:"AWS region to use" default:"eu-west-1"`
+	AnswerMaxTokens   int     `long:"bedrock_max_tokens" env:"BEDROCK_ANSWER_MAX_TOKENS" description:"Maximum tokens to include in the answer" default:"1500"`
+	AnswerTemperature float64 `long:"bedrock_temperature" env:"BEDROCK_ANSWER_TEMPERATURE" description:"Temperature for the Bedrock model answers" default:"0.1"`
+	AnswerTopP        float64 `long:"bedrock_top_p" env:"BEDROCK_ANSWER_TOP_P" description:"TopP for the Bedrock model answers" default:"0.9"`
 }
 
 type Log struct {

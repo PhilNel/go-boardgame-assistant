@@ -1,6 +1,22 @@
-# Board Game Assistant Lambda
+# Board Game Assistant Lambda Functions
 
-This repository contains the Lambda function for the Board Game Assistant project. The Lambda function serves as the backend for answering questions about board game rules using AWS Bedrock and Claude.
+This repository contains two Lambda functions for the Board Game Assistant project:
+
+## Lambda Functions
+
+### 1. Knowledge Processor (`knowledge-processor`)
+This Lambda function processes and indexes board game rules from markdown files stored in S3.
+- Reads game rule files from S3 storage
+- Generates embeddings using AWS Bedrock
+- Stores the processed knowledge chunks with embeddings in DynamoDB
+- Tracks processing status for each game
+
+### 2. Question Handler (`question-handler`)
+This Lambda function serves as the main API backend for answering questions about board game rules.
+- Receives user questions about specific board games
+- Performs vector similarity search to find relevant rule sections
+- Uses AWS Bedrock and Claude to generate contextual answers
+- Returns natural language responses based on the game's rules
 
 ## Prerequisites
 
@@ -15,29 +31,15 @@ This repository contains the Lambda function for the Board Game Assistant projec
    make vendor
    ```
 
-2. Run locally:
-   ```bash
-   make run
-   ```
-
-3. Build the Lambda package:
+2. Build the Lambda package:
    ```bash
    make package
    ```
 
-4. Deploy to AWS:
+3. Deploy to AWS:
    ```bash
    make deploy
    ```
-
-## Environment Variables
-
-The Lambda function expects the following environment variables:
-
-- `KNOWLEDGE_BUCKET_NAME` - S3 bucket containing game knowledge files (required)
-- `AWS_REGION` - AWS region for both S3 and Bedrock services (default: us-east-1)
-- `BEDROCK_MODEL_ID` - Bedrock model ID to use (default: anthropic.claude-3-haiku-20240307-v1:0)
-- `LOG_LEVEL` - Logging level (debug, info, warn, error) (default: info)
 
 ## Integration with Other Repositories
 

@@ -13,11 +13,13 @@ import (
 
 type TemplateProvider interface {
 	GetPromptTemplate() string
+	GetPromptTemplateForQuestion(question string) string
 }
 
 type BedrockProvider struct {
 	bedrockClient    *aws.BedrockClient
 	templateProvider TemplateProvider
+	config           *config.Bedrock
 }
 
 func NewBedrockProvider(config *config.Bedrock, templateProvider TemplateProvider) (*BedrockProvider, error) {
@@ -29,17 +31,22 @@ func NewBedrockProvider(config *config.Bedrock, templateProvider TemplateProvide
 	return &BedrockProvider{
 		bedrockClient:    bedrockClient,
 		templateProvider: templateProvider,
+		config:           config,
 	}, nil
 }
 
 func (b *BedrockProvider) GenerateAnswer(ctx context.Context, request *types.AnswerRequest) (string, error) {
-	template := b.templateProvider.GetPromptTemplate()
+	template := b.templateProvider.GetPromptTemplateForQuestion(request.Question)
 	systemPrompt := strings.ReplaceAll(template, "{game}", request.GameName)
 	userContent := fmt.Sprintf("%s\n\nGame Context:\n%s\n\nQuestion: %s", systemPrompt, request.Knowledge, request.Question)
 
 	log.Printf("Using Bedrock model ID: %s for game: %s", b.bedrockClient.GetModelID(), request.GameName)
 	log.Printf("Request context: Knowledge length=%d, Question length=%d", len(request.Knowledge), len(request.Question))
 
+	return b.generateAnswerWithClaude(ctx, userContent)
+}
+
+func (b *BedrockProvider) generateAnswerWithClaude(ctx context.Context, userContent string) (string, error) {
 	bedrockRequest := &aws.BedrockRequest{
 		AnthropicVersion: "bedrock-2023-05-31",
 		Messages: []aws.BedrockMessage{
@@ -48,8 +55,9 @@ func (b *BedrockProvider) GenerateAnswer(ctx context.Context, request *types.Ans
 				Content: userContent,
 			},
 		},
-		MaxTokens:   1000,
-		Temperature: 0.7,
+		MaxTokens:   b.config.AnswerMaxTokens,
+		Temperature: b.config.AnswerTemperature,
+		TopP:        b.config.AnswerTopP,
 	}
 
 	response, err := b.bedrockClient.InvokeModel(ctx, bedrockRequest)
