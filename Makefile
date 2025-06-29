@@ -5,7 +5,7 @@ PROCESSOR_CMD_DIR=cmd/knowledge-processor
 BUCKET_NAME := boardgame-assistant-artefacts-dev-eu-west-1
 
 # Lambda settings
-LAMBDA_NAME := go-boardgame-rules-assistant
+RULES_ASSISTANT_LAMBDA_NAME := go-boardgame-rules-assistant
 PROCESSOR_RULES_ASSISTANT_LAMBDA_NAME := go-boardgame-knowledge-processor
 
 BINARY_NAME := bootstrap
