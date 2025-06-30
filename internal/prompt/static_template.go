@@ -117,7 +117,7 @@ WRITING STYLE:
 - Use **bold headers** for each major section: "**Effects on Characters**", "**Key Rules**", etc.
 
 
-STRUCTURE:
+STRUCTURE FOR COMPREHENSIVE QUESTIONS:
 - Overview/introduction
 - Key components or steps
 - Important rules and exceptions
