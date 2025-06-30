@@ -67,59 +67,15 @@ func (v *VectorProvider) GetKnowledge(ctx context.Context, gameName string, quer
 
 	log.Printf("Retrieved %d chunks for game '%s'", len(chunks), gameName)
 
-	// Calculate similarities and filter by minimum threshold
-	var results []*SearchResult
-	var allSimilarities []float64
-	minSimilarity := v.ragConfig.MinSimilarity
+	results, allSimilarities := v.selectResultsAboveThreshold(chunks, queryEmbedding)
 
-	for _, chunk := range chunks {
-
-		similarity := v.cosineSimilarity(queryEmbedding, chunk.Embedding)
-
-		allSimilarities = append(allSimilarities, similarity)
-
-		// Log each chunk's similarity for debugging
-		log.Printf("Chunk similarity: %.4f (file: %s, threshold: %.2f) - %s",
-			similarity, chunk.SourceFile, minSimilarity,
-			func() string {
-				if similarity >= minSimilarity {
-					return "INCLUDED"
-				}
-				return "EXCLUDED"
-			}())
-
-		if similarity >= minSimilarity {
-			results = append(results, &SearchResult{
-				Chunk:      chunk,
-				Similarity: similarity,
-			})
-		}
-	}
-
-	if len(allSimilarities) > 0 {
-		maxSim := allSimilarities[0]
-		minSim := allSimilarities[0]
-		var avgSim float64
-		for _, sim := range allSimilarities {
-			if sim > maxSim {
-				maxSim = sim
-			}
-			if sim < minSim {
-				minSim = sim
-			}
-			avgSim += sim
-		}
-		avgSim /= float64(len(allSimilarities))
-
-		log.Printf("Similarity stats for query '%s': min=%.4f, max=%.4f, avg=%.4f, threshold=%.2f, chunks_above_threshold=%d/%d",
-			query, minSim, maxSim, avgSim, minSimilarity, len(results), len(chunks))
-	}
+	v.logSimilarityStats(query, allSimilarities, results, len(chunks))
 
 	if len(results) == 0 {
 		return "", &NoRelevantKnowledgeError{
 			GameName:      gameName,
 			Query:         query,
-			MinSimilarity: minSimilarity,
+			MinSimilarity: v.ragConfig.MinSimilarity,
 			ChunksFound:   len(chunks),
 		}
 	}
@@ -131,21 +87,12 @@ func (v *VectorProvider) GetKnowledge(ctx context.Context, gameName string, quer
 
 	selectedResults := v.selectChunksWithinTokenBudget(results)
 
-	var combinedKnowledge strings.Builder
-	totalTokens := 0
-
-	for i, result := range selectedResults {
-		combinedKnowledge.WriteString(fmt.Sprintf("Source %d (Similarity: %.2f, File: %s):\n",
-			i+1, result.Similarity, result.Chunk.SourceFile))
-		combinedKnowledge.WriteString(result.Chunk.Content)
-		combinedKnowledge.WriteString("\n\n")
-		totalTokens += result.Chunk.TokenCount
-	}
+	combinedKnowledge := v.buildCombinedKnowledge(selectedResults, query)
 
 	log.Printf("Vector search for '%s': found %d chunks above %.2f similarity, selected %d chunks with %d total tokens",
-		query, len(results), minSimilarity, len(selectedResults), totalTokens)
+		query, len(results), v.ragConfig.MinSimilarity, len(selectedResults), v.calculateTotalTokens(selectedResults))
 
-	return combinedKnowledge.String(), nil
+	return combinedKnowledge, nil
 }
 
 func (v *VectorProvider) createEmbedding(ctx context.Context, text string) ([]float64, error) {
@@ -216,4 +163,78 @@ func (v *VectorProvider) selectChunksWithinTokenBudget(results []*SearchResult) 
 		len(selected), totalTokens, maxTokens)
 
 	return selected
+}
+
+func (v *VectorProvider) selectResultsAboveThreshold(chunks []*Chunk, queryEmbedding []float64) ([]*SearchResult, []float64) {
+	var results []*SearchResult
+	var allSimilarities []float64
+	minSimilarity := v.ragConfig.MinSimilarity
+
+	for _, chunk := range chunks {
+		similarity := v.cosineSimilarity(queryEmbedding, chunk.Embedding)
+		allSimilarities = append(allSimilarities, similarity)
+
+		// Log each chunk's similarity for debugging (only if above threshold)
+		if similarity >= minSimilarity {
+			log.Printf("Chunk similarity: %.4f (file: %s, threshold: %.2f) - INCLUDED",
+				similarity, chunk.SourceFile, minSimilarity)
+
+			results = append(results, &SearchResult{
+				Chunk:      chunk,
+				Similarity: similarity,
+			})
+		}
+	}
+
+	return results, allSimilarities
+}
+
+func (v *VectorProvider) logSimilarityStats(query string, allSimilarities []float64, results []*SearchResult, totalChunks int) {
+	if len(allSimilarities) == 0 {
+		return
+	}
+
+	maxSim := allSimilarities[0]
+	minSim := allSimilarities[0]
+	var avgSim float64
+
+	for _, sim := range allSimilarities {
+		if sim > maxSim {
+			maxSim = sim
+		}
+		if sim < minSim {
+			minSim = sim
+		}
+		avgSim += sim
+	}
+	avgSim /= float64(len(allSimilarities))
+
+	log.Printf("Similarity stats for query '%s': min=%.4f, max=%.4f, avg=%.4f, threshold=%.2f, chunks_above_threshold=%d/%d",
+		query, minSim, maxSim, avgSim, v.ragConfig.MinSimilarity, len(results), totalChunks)
+}
+
+func (v *VectorProvider) buildCombinedKnowledge(selectedResults []*SearchResult, query string) string {
+	log.Printf("=== SELECTED CHUNKS FOR QUERY: '%s' ===", query)
+
+	var combinedKnowledge strings.Builder
+	for i, result := range selectedResults {
+		log.Printf("Chunk %d: File=%s, Tokens=%d, Similarity=%.4f",
+			i+1, result.Chunk.SourceFile, result.Chunk.TokenCount, result.Similarity)
+		combinedKnowledge.WriteString(fmt.Sprintf("Source %d (Similarity: %.2f, File: %s):\n",
+			i+1, result.Similarity, result.Chunk.SourceFile))
+		combinedKnowledge.WriteString(result.Chunk.Content)
+		combinedKnowledge.WriteString("\n\n")
+	}
+	log.Printf("=== END SELECTED CHUNKS ===")
+
+	return combinedKnowledge.String()
+}
+
+// calculateTotalTokens calculates the total token count for selected results
+func (v *VectorProvider) calculateTotalTokens(selectedResults []*SearchResult) int {
+	totalTokens := 0
+	for _, result := range selectedResults {
+		totalTokens += result.Chunk.TokenCount
+	}
+	return totalTokens
 }

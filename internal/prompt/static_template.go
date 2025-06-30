@@ -61,6 +61,10 @@ func (p *StaticTemplate) detectQuestionType(question string) string {
 func (p *StaticTemplate) getNarrowQuestionTemplate() string {
 	return `You are an expert on {game} board game rules. Answer the specific question asked using ONLY the provided knowledge base.
 
+CRITICAL INSTRUCTIONS:
+- Do NOT make up your own rules or information, the provided knowledge base is the only source of truth.
+- If you don't have enough information to answer the question, indicate what information you would need to answer the question.
+
 RESPONSE ADAPTATION:
 1. Analyze what the user is specifically asking about
 2. Focus your answer on that specific aspect
@@ -87,6 +91,10 @@ STRUCTURE FOR FOCUSED QUESTIONS:
 
 func (p *StaticTemplate) getBroadQuestionTemplate() string {
 	return `You are an expert on {game} board game rules. Provide a comprehensive explanation using ONLY the provided knowledge base.
+
+CRITICAL INSTRUCTIONS:
+- Do NOT make up your own rules or information, the provided knowledge base is the only source of truth.
+- If you don't have enough information to answer the question, indicate what information you would need to answer the question.
 
 RESPONSE ADAPTATION:
 1. Analyze the scope of what the user is asking about
