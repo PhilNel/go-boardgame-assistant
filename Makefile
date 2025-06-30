@@ -1,19 +1,30 @@
 # Project settings
-CMD_DIR=cmd/lambda
-BIN_NAME=boardgame-assistant
-OUTPUT_BIN=./bin/$(BIN_NAME)
+LAMBDA_CMD_DIR=cmd/question-handler
+PROCESSOR_CMD_DIR=cmd/knowledge-processor
+
 BUCKET_NAME := boardgame-assistant-artefacts-dev-eu-west-1
-LAMBDA_NAME := go-boardgame-rules-assistant
-ZIP_FILE := $(LAMBDA_NAME).zip
+
+# Lambda settings
+RULES_ASSISTANT_LAMBDA_NAME := go-boardgame-rules-assistant
+PROCESSOR_RULES_ASSISTANT_LAMBDA_NAME := go-boardgame-knowledge-processor
+
 BINARY_NAME := bootstrap
 
 .PHONY: run
 run:
-	go run $(CMD_DIR)/main.go
+	go run $(LAMBDA_CMD_DIR)/main.go
+
+.PHONY: run-processor
+run-processor:
+	go run $(PROCESSOR_CMD_DIR)/main.go
 
 .PHONY: build
 build:
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BINARY_NAME) ./$(CMD_DIR)
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BINARY_NAME) ./$(LAMBDA_CMD_DIR)
+
+.PHONY: build-processor
+build-processor:
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BINARY_NAME) ./$(PROCESSOR_CMD_DIR)
 
 .PHONY: vendor
 vendor:
@@ -34,16 +45,27 @@ lint:
 
 .PHONY: package
 package: build
-	zip -j $(ZIP_FILE) $(BINARY_NAME)
+	zip -j $(RULES_ASSISTANT_LAMBDA_NAME).zip $(BINARY_NAME)
+
+.PHONY: package-processor
+package-processor: build-processor
+	zip -j $(PROCESSOR_LAMBDA_NAME).zip $(BINARY_NAME)
 
 .PHONY: upload
 upload:
-	aws s3 cp $(ZIP_FILE) s3://$(BUCKET_NAME)/$(ZIP_FILE)
+	aws s3 cp $(RULES_ASSISTANT_LAMBDA_NAME).zip s3://$(BUCKET_NAME)/$(RULES_ASSISTANT_LAMBDA_NAME).zip
+
+.PHONY: upload-processor
+upload-processor:
+	aws s3 cp $(PROCESSOR_LAMBDA_NAME).zip s3://$(BUCKET_NAME)/$(PROCESSOR_LAMBDA_NAME).zip
 
 .PHONY: deploy
 deploy: package upload
 
+.PHONY: deploy-processor
+deploy-processor: package-processor upload-processor
+
 .PHONY: clean
 clean:
 	@echo "🧹 Cleaning up..."
-	rm -f $(BINARY_NAME) $(ZIP_FILE) 
+	rm -f $(BINARY_NAME) $(RULES_ASSISTANT_LAMBDA_NAME).zip $(PROCESSOR_LAMBDA_NAME).zip 

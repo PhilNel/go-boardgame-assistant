@@ -25,11 +25,11 @@ func init() {
 	}
 	log.Printf("Loaded config: %+v", cfg)
 
-	knowledgeProvider, err := knowledge.NewS3Provider(cfg.S3)
+	knowledgeProvider, err := knowledge.NewVectorProvider(cfg.DynamoDB, cfg.Bedrock, cfg.RAG)
 	if err != nil {
-		log.Fatalf("Failed to initialize knowledge provider: %v", err)
+		log.Fatalf("Failed to initialize vector knowledge provider: %v", err)
 	}
-	log.Printf("Knowledge provider initialized successfully")
+	log.Printf("Vector knowledge provider initialized successfully")
 
 	templateProvider := prompt.NewStaticTemplate()
 	log.Printf("Template provider initialized successfully")
