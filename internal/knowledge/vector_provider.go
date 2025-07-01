@@ -174,7 +174,6 @@ func (v *VectorProvider) selectResultsAboveThreshold(chunks []*Chunk, queryEmbed
 		similarity := v.cosineSimilarity(queryEmbedding, chunk.Embedding)
 		allSimilarities = append(allSimilarities, similarity)
 
-		// Log each chunk's similarity for debugging (only if above threshold)
 		if similarity >= minSimilarity {
 			log.Printf("Chunk similarity: %.4f (file: %s, threshold: %.2f) - INCLUDED",
 				similarity, chunk.SourceFile, minSimilarity)
@@ -183,6 +182,9 @@ func (v *VectorProvider) selectResultsAboveThreshold(chunks []*Chunk, queryEmbed
 				Chunk:      chunk,
 				Similarity: similarity,
 			})
+		} else {
+			log.Printf("Chunk similarity: %.4f (file: %s, threshold: %.2f) - EXCLUDED",
+				similarity, chunk.SourceFile, minSimilarity)
 		}
 	}
 
