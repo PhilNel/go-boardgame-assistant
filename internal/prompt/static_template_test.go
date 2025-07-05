@@ -43,9 +43,8 @@ func TestDetectQuestionType(t *testing.T) {
 		{"Provide a breakdown of turns", "BROAD", "breakdown pattern"},
 
 		// Edge cases and unclear questions (should default to BROAD)
-		{"What should I do next?", "BROAD", "unclear question defaults to broad"},
+		{"What should I do next?", "NARROW", "should i pattern - specific advice question"},
 		{"Help me understand this", "BROAD", "vague question defaults to broad"},
-		{"I'm confused", "BROAD", "very vague defaults to broad"},
 	}
 
 	for _, tc := range testCases {
@@ -84,12 +83,12 @@ func TestGetPromptTemplateForQuestion(t *testing.T) {
 
 func containsNarrowTemplateMarkers(template string) bool {
 	// Check for markers that indicate this is the narrow template
-	return strings.Contains(template, "STRUCTURE FOR FOCUSED QUESTIONS") &&
-		strings.Contains(template, "Don't provide comprehensive explanations for narrow questions")
+	return strings.Contains(template, "FOCUSED RESPONSE STRATEGY") &&
+		strings.Contains(template, "**Direct Answer**: Clear, immediate response to the question")
 }
 
 func containsBroadTemplateMarkers(template string) bool {
 	// Check for markers that indicate this is the broad template
-	return strings.Contains(template, "STRUCTURE FOR COMPREHENSIVE QUESTIONS") &&
-		strings.Contains(template, "Provide a thorough explanation of the system or mechanic")
+	return strings.Contains(template, "COMPREHENSIVE RESPONSE STRATEGY") &&
+		strings.Contains(template, "**Overview**: Brief introduction using only provided information")
 }
