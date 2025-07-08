@@ -49,6 +49,8 @@ type RAG struct {
 	TopK           int     `long:"rag_top_k" env:"RAG_TOP_K" description:"Maximum number of chunks to retrieve" default:"10"`
 	CacheTTLHours  int     `long:"cache_ttl_hours" env:"CACHE_TTL_HOURS" description:"Cache TTL in hours" default:"24"`
 	MaxChunkTokens int     `long:"max_chunk_tokens" env:"MAX_CHUNK_TOKENS" description:"Maximum tokens per chunk" default:"500"`
+	VectorWeight   float64 `long:"rag_vector_weight" env:"RAG_VECTOR_WEIGHT" description:"Weight for vector search in hybrid mode" default:"0.7"`
+	KeywordWeight  float64 `long:"rag_keyword_weight" env:"RAG_KEYWORD_WEIGHT" description:"Weight for keyword search in hybrid mode" default:"0.3"`
 }
 
 func Load() (*Config, error) {
