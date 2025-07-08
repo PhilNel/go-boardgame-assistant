@@ -5,7 +5,9 @@ import (
 	"log"
 
 	"github.com/PhilNel/go-boardgame-assistant/internal/answer"
+	"github.com/PhilNel/go-boardgame-assistant/internal/aws"
 	"github.com/PhilNel/go-boardgame-assistant/internal/config"
+	"github.com/PhilNel/go-boardgame-assistant/internal/embedding"
 	"github.com/PhilNel/go-boardgame-assistant/internal/handler"
 	"github.com/PhilNel/go-boardgame-assistant/internal/knowledge"
 	"github.com/PhilNel/go-boardgame-assistant/internal/prompt"
@@ -25,23 +27,23 @@ func init() {
 	}
 	log.Printf("Loaded config: %+v", cfg)
 
-	knowledgeProvider, err := knowledge.NewVectorProvider(cfg.DynamoDB, cfg.Bedrock, cfg.RAG)
+	dynamoClient, err := aws.NewDynamoDBClient(cfg.DynamoDB)
 	if err != nil {
-		log.Fatalf("Failed to initialize vector knowledge provider: %v", err)
+		log.Fatalf("Failed to create DynamoDB client: %v", err)
 	}
-	log.Printf("Vector knowledge provider initialized successfully")
+	knowledgeRepo := knowledge.NewDynamoDBRepository(dynamoClient, cfg.DynamoDB.KnowledgeTable)
+
+	bedrockClient, err := aws.NewAWSBedrockClient(cfg.Bedrock)
+	if err != nil {
+		log.Fatalf("Failed to create Bedrock client: %v", err)
+	}
+	embeddingProvider := embedding.NewBedrockCreator(bedrockClient)
 
 	templateProvider := prompt.NewStaticTemplate()
-	log.Printf("Template provider initialized successfully")
 
-	answerProvider, err := answer.NewBedrockProvider(cfg.Bedrock, templateProvider)
-	if err != nil {
-		log.Fatalf("Failed to initialize answer provider: %v", err)
-	}
-	log.Printf("Answer provider initialized successfully")
-
+	answerProvider := answer.NewBedrockProvider(bedrockClient, templateProvider, cfg.Bedrock)
+	knowledgeProvider := knowledge.NewVectorProvider(knowledgeRepo, embeddingProvider, cfg.RAG)
 	questionHandler = handler.NewQuestionHandler(knowledgeProvider, answerProvider)
-	log.Printf("Question handler initialized successfully")
 }
 
 func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -58,7 +60,6 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		return utils.CreateErrorResponse(500, "Internal server error"), nil
 	}
 
-	log.Printf("Handler completed successfully with status: %d", response.StatusCode)
 	return response, nil
 }
 

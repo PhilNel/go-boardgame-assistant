@@ -6,22 +6,16 @@ import (
 	"fmt"
 
 	"github.com/PhilNel/go-boardgame-assistant/internal/aws"
-	"github.com/PhilNel/go-boardgame-assistant/internal/config"
 )
 
 type BedrockCreator struct {
-	bedrockClient *aws.BedrockClient
+	bedrockClient aws.BedrockClient
 }
 
-func NewBedrockCreator(cfg *config.Bedrock) (*BedrockCreator, error) {
-	bedrockClient, err := aws.NewBedrockClient(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Bedrock client: %w", err)
-	}
-
+func NewBedrockCreator(bedrockClient aws.BedrockClient) *BedrockCreator {
 	return &BedrockCreator{
 		bedrockClient: bedrockClient,
-	}, nil
+	}
 }
 
 func (b *BedrockCreator) CreateEmbedding(ctx context.Context, text string) ([]float64, error) {

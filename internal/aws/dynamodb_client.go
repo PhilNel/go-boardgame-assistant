@@ -13,11 +13,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-type DynamoDBClient struct {
+type AWSDynamoDBClient struct {
 	client *dynamodb.Client
 }
 
-func NewDynamoDBClient(cfg *configPkg.DynamoDB) (*DynamoDBClient, error) {
+func NewDynamoDBClient(cfg *configPkg.DynamoDB) (*AWSDynamoDBClient, error) {
 	ctx := context.Background()
 
 	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.Region))
@@ -27,12 +27,12 @@ func NewDynamoDBClient(cfg *configPkg.DynamoDB) (*DynamoDBClient, error) {
 
 	client := dynamodb.NewFromConfig(awsCfg)
 
-	return &DynamoDBClient{
+	return &AWSDynamoDBClient{
 		client: client,
 	}, nil
 }
 
-func (d *DynamoDBClient) PutItem(ctx context.Context, tableName string, item interface{}) error {
+func (d *AWSDynamoDBClient) PutItem(ctx context.Context, tableName string, item interface{}) error {
 	itemMap, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		return fmt.Errorf("failed to marshal item: %w", err)
@@ -49,7 +49,7 @@ func (d *DynamoDBClient) PutItem(ctx context.Context, tableName string, item int
 	return nil
 }
 
-func (d *DynamoDBClient) GetItem(ctx context.Context, tableName string, key map[string]types.AttributeValue, result interface{}) error {
+func (d *AWSDynamoDBClient) GetItem(ctx context.Context, tableName string, key map[string]types.AttributeValue, result interface{}) error {
 	output, err := d.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(tableName),
 		Key:       key,
@@ -70,7 +70,7 @@ func (d *DynamoDBClient) GetItem(ctx context.Context, tableName string, key map[
 	return nil
 }
 
-func (d *DynamoDBClient) Query(ctx context.Context, tableName string, indexName *string, keyCondition string, expressionValues map[string]types.AttributeValue, results interface{}) error {
+func (d *AWSDynamoDBClient) Query(ctx context.Context, tableName string, indexName *string, keyCondition string, expressionValues map[string]types.AttributeValue, results interface{}) error {
 	input := &dynamodb.QueryInput{
 		TableName:                 aws.String(tableName),
 		KeyConditionExpression:    aws.String(keyCondition),
@@ -94,7 +94,7 @@ func (d *DynamoDBClient) Query(ctx context.Context, tableName string, indexName 
 	return nil
 }
 
-func (d *DynamoDBClient) BatchWriteItems(ctx context.Context, tableName string, items []interface{}) error {
+func (d *AWSDynamoDBClient) BatchWriteItems(ctx context.Context, tableName string, items []interface{}) error {
 	const batchSize = 25 // DynamoDB batch write limit
 
 	for i := 0; i < len(items); i += batchSize {
@@ -136,7 +136,7 @@ func (d *DynamoDBClient) BatchWriteItems(ctx context.Context, tableName string, 
 	return nil
 }
 
-func (d *DynamoDBClient) UpdateItem(ctx context.Context, tableName string, key map[string]types.AttributeValue, updateExpression string, expressionValues map[string]types.AttributeValue) error {
+func (d *AWSDynamoDBClient) UpdateItem(ctx context.Context, tableName string, key map[string]types.AttributeValue, updateExpression string, expressionValues map[string]types.AttributeValue) error {
 	_, err := d.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(tableName),
 		Key:                       key,

@@ -2,19 +2,16 @@ package knowledge
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"sort"
 	"strings"
 
-	"github.com/PhilNel/go-boardgame-assistant/internal/aws"
 	"github.com/PhilNel/go-boardgame-assistant/internal/config"
-	"github.com/PhilNel/go-boardgame-assistant/internal/embedding"
+	"github.com/PhilNel/go-boardgame-assistant/internal/utils"
 )
 
-// NoRelevantKnowledgeError represents when no knowledge chunks meet the similarity threshold
+// When no knowledge chunks meet the similarity threshold
 type NoRelevantKnowledgeError struct {
 	GameName      string
 	Query         string
@@ -27,48 +24,33 @@ func (e *NoRelevantKnowledgeError) Error() string {
 }
 
 type VectorProvider struct {
-	repository    *DynamoDBRepository
-	bedrockClient *aws.BedrockClient
-	ragConfig     *config.RAG
+	knowledgeRepo     KnowledgeRepository
+	embeddingProvider EmbeddingProvider
+	ragConfig         *config.RAG
 }
 
-func NewVectorProvider(dynamoConfig *config.DynamoDB, bedrockConfig *config.Bedrock, ragConfig *config.RAG) (*VectorProvider, error) {
-	repository, err := NewDynamoDBRepository(dynamoConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize knowledge repository: %w", err)
-	}
-
-	bedrockClient, err := aws.NewBedrockClient(bedrockConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Bedrock client: %w", err)
-	}
-
+func NewVectorProvider(knowledgeRepo KnowledgeRepository, embeddingProvider EmbeddingProvider, ragConfig *config.RAG) *VectorProvider {
 	return &VectorProvider{
-		repository:    repository,
-		bedrockClient: bedrockClient,
-		ragConfig:     ragConfig,
-	}, nil
+		knowledgeRepo:     knowledgeRepo,
+		embeddingProvider: embeddingProvider,
+		ragConfig:         ragConfig,
+	}
 }
 
 func (v *VectorProvider) GetKnowledge(ctx context.Context, gameName string, query string) (string, error) {
-	queryEmbedding, err := v.createEmbedding(ctx, query)
+	queryEmbedding, err := v.embeddingProvider.CreateEmbedding(ctx, query)
 	if err != nil {
 		return "", fmt.Errorf("failed to create query embedding: %w", err)
 	}
 
-	chunks, err := v.repository.GetKnowledgeChunksByGame(ctx, gameName)
+	chunks, err := v.knowledgeRepo.GetKnowledgeChunksByGame(ctx, gameName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get knowledge chunks: %w", err)
-	}
-
-	if len(chunks) == 0 {
-		return "", fmt.Errorf("no knowledge chunks found for game: %s", gameName)
 	}
 
 	log.Printf("Retrieved %d chunks for game '%s'", len(chunks), gameName)
 
 	results, allSimilarities := v.selectResultsAboveThreshold(chunks, queryEmbedding)
-
 	v.logSimilarityStats(query, allSimilarities, results, len(chunks))
 
 	if len(results) == 0 {
@@ -80,13 +62,7 @@ func (v *VectorProvider) GetKnowledge(ctx context.Context, gameName string, quer
 		}
 	}
 
-	// Sort by similarity (descending - highest similarity first)
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Similarity > results[j].Similarity
-	})
-
 	selectedResults := v.selectChunksWithinTokenBudget(results)
-
 	combinedKnowledge := v.buildCombinedKnowledge(selectedResults, query)
 
 	log.Printf("Vector search for '%s': found %d chunks above %.2f similarity, selected %d chunks with %d total tokens",
@@ -95,55 +71,10 @@ func (v *VectorProvider) GetKnowledge(ctx context.Context, gameName string, quer
 	return combinedKnowledge, nil
 }
 
-func (v *VectorProvider) createEmbedding(ctx context.Context, text string) ([]float64, error) {
-	request := &embedding.TitanRequest{
-		InputText:  text,
-		Dimensions: 256,
-		Normalize:  true,
-	}
-
-	requestBody, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal embedding request: %w", err)
-	}
-
-	response, err := v.bedrockClient.InvokeEmbeddingModel(ctx, requestBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to invoke embedding model: %w", err)
-	}
-
-	var embeddingResponse embedding.TitanResponse
-	if err := json.Unmarshal(response, &embeddingResponse); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal embedding response: %w", err)
-	}
-
-	return embeddingResponse.Embedding, nil
-}
-
-func (v *VectorProvider) cosineSimilarity(a, b []float64) float64 {
-	if len(a) != len(b) {
-		log.Printf("DEBUG: Similarity calculation failed - length mismatch: a=%d, b=%d", len(a), len(b))
-		return 0.0
-	}
-
-	var dotProduct, normA, normB float64
-	for i := range a {
-		dotProduct += a[i] * b[i]
-		normA += a[i] * a[i]
-		normB += b[i] * b[i]
-	}
-
-	if normA == 0 || normB == 0 {
-		log.Printf("DEBUG: Similarity calculation failed - zero norm: normA=%.6f, normB=%.6f", normA, normB)
-		return 0.0
-	}
-
-	similarity := dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
-
-	return similarity
-}
-
 func (v *VectorProvider) selectChunksWithinTokenBudget(results []*SearchResult) []*SearchResult {
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Similarity > results[j].Similarity
+	})
 	var selected []*SearchResult
 	totalTokens := 0
 	maxTokens := v.ragConfig.MaxTokens
@@ -171,7 +102,7 @@ func (v *VectorProvider) selectResultsAboveThreshold(chunks []*Chunk, queryEmbed
 	minSimilarity := v.ragConfig.MinSimilarity
 
 	for _, chunk := range chunks {
-		similarity := v.cosineSimilarity(queryEmbedding, chunk.Embedding)
+		similarity := utils.CosineSimilarity(queryEmbedding, chunk.Embedding)
 		allSimilarities = append(allSimilarities, similarity)
 
 		if similarity >= minSimilarity {
