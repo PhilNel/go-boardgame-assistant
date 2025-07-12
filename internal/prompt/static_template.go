@@ -1,7 +1,6 @@
 package prompt
 
 import (
-	"fmt"
 	"log"
 	"strings"
 )
@@ -13,116 +12,119 @@ func NewStaticTemplate() *StaticTemplate {
 }
 
 func (p *StaticTemplate) GetPromptTemplate() string {
-	return p.getBroadQuestionTemplate()
+	return p.getStandardTemplate()
 }
 
 func (p *StaticTemplate) GetPromptTemplateForQuestion(question string) string {
-	questionType := p.detectQuestionType(question)
+	complexity := p.detectComplexity(question)
 
-	log.Printf("Question type detected: %s for question: %s", questionType, question)
+	log.Printf("Question complexity: %s for question: %s", complexity, question)
 
-	if questionType == "NARROW" {
-		return p.getNarrowQuestionTemplate()
+	if complexity == "SIMPLE" {
+		return p.getSimpleTemplate()
 	}
-	return p.getBroadQuestionTemplate()
+	return p.getStandardTemplate()
 }
 
-func (p *StaticTemplate) detectQuestionType(question string) string {
+func (p *StaticTemplate) detectComplexity(question string) string {
 	question = strings.ToLower(question)
 
-	// Broad question patterns - system explanations and overviews
-	broadPatterns := []string{
-		"how does", "how do", "explain", "what is", "tell me about",
-		"work", "system", "mechanic", "overview", "breakdown",
-		"walk me through", "give me", "describe", "what are all",
+	// Simple queries - single fact lookups
+	simpleIndicators := []string{
+		"how many", "how much", "what is the cost", "what does",
+		"which card", "what room", "can i", "do i need",
+		"is it possible", "does it cost", "when do i",
+		"where do i", "what happens if", "am i allowed",
 	}
 
-	// Narrow question patterns - specific queries and yes/no questions
-	narrowPatterns := []string{
-		"how are", "how is", "what happens when", "can i", "can you",
-		"do i", "does", "is it possible", "what causes", "when does",
-		"where do", "which", "what deck", "how many", "what room",
-		"should i", "must i", "am i allowed", "is there a way",
+	// Complex queries - system explanations, multi-part questions
+	complexIndicators := []string{
+		"how does", "explain", "walk me through", "what are all",
+		"tell me about", "what's the difference between",
+		"compare", "overview", "breakdown", "strategy",
+		"and", "or", "also", "plus", "additionally",
 	}
 
-	// Check broad patterns first to catch "how does" before "does"
-	for _, pattern := range broadPatterns {
-		if strings.Contains(question, pattern) {
-			return "BROAD"
+	// Check complex indicators first
+	for _, indicator := range complexIndicators {
+		if strings.Contains(question, indicator) {
+			return "COMPLEX"
 		}
 	}
 
-	for _, pattern := range narrowPatterns {
-		if strings.Contains(question, pattern) {
-			return "NARROW"
+	// Check simple indicators
+	for _, indicator := range simpleIndicators {
+		if strings.Contains(question, indicator) {
+			return "SIMPLE"
 		}
 	}
 
-	return "BROAD" // Default to comprehensive for unclear cases
+	// Check for multiple question words or complex sentence structure as fallback
+	questionWords := strings.Count(question, "how") +
+		strings.Count(question, "what") +
+		strings.Count(question, "when") +
+		strings.Count(question, "where") +
+		strings.Count(question, "why")
+
+	if questionWords > 1 {
+		return "COMPLEX"
+	}
+
+	// Default to complex for safety
+	return "COMPLEX"
 }
 
-func (p *StaticTemplate) getCommonTemplate() string {
-	return `You are an expert on {game} board game rules. %s
+func (p *StaticTemplate) getBaseTemplate() string {
+	return `You are a knowledgeable {game} rules expert. Answer questions using ONLY the provided rulebook context.
 
-CORE PRINCIPLES:
-- Answer ONLY using information explicitly stated in the provided context
-- Do NOT add details, assumptions, or logical inferences not directly stated in the rules
-- If specific mechanics aren't explained in the context, simply state what IS covered
-- Stick strictly to the exact wording and information provided
+CRITICAL ACCURACY REQUIREMENTS:
+- Base all answers strictly on information present in the provided context
+- Do NOT invent rules, mechanics, or details not explicitly stated
+- Do NOT make logical assumptions about how things "should" work
+- When connecting related rules, only reference connections explicitly stated in the context
+- If essential information is missing, direct users to relevant sections rather than guessing
 
-RESPONSE FORMATTING:
-- **Bold section headers** like "**Combat Resolution**", "**Movement Rules**", "**Victory Conditions**"
-- Use bullet points (•) only for actual lists of items, steps, or key points
-- Write explanatory content as natural paragraphs, not bullet points
-- **Bold important game terms** like **Action Points**, **Status Effects**, **Card Types**
-- Avoid numbered lists - use bullet points sparingly and only when listing discrete items
+RESPONSE STYLE:
+- Write confidently about information that IS in the provided context
+- Use the exact terminology and phrasing from the rulebook when possible
+- **Bold important terms** like **Action Points**, **Status Effects**, **Card Names**
+- Use **bold headers** for major sections when organizing complex information
+- Be direct and practical - focus on what players need to know
 
-TONE AND STYLE:
-- %s
-- Use clear, natural language transitions
-- Be conversational but authoritative
-- Only include examples that are explicitly mentioned in the provided context
-- Never invent steps, procedures, or details not stated in the rules`
+FORMATTING:
+- Use paragraphs for explanations and descriptions
+- Use bullet points (•) only for actual lists of items, options, or sequential steps
+- Avoid numbered lists unless showing a specific sequence
+- Keep responses focused and eliminate redundancy`
 }
 
-func (p *StaticTemplate) getNarrowQuestionTemplate() string {
-	common := p.getCommonTemplate()
+func (p *StaticTemplate) getSimpleTemplate() string {
+	base := p.getBaseTemplate()
 
-	specificApproach := `FOCUSED RESPONSE STRATEGY:
-• Lead with a direct answer using only the provided information
-• List only the specific details explicitly stated in the context
-• Do NOT add implied steps, assumed procedures, or invented details
-• If the context doesn't fully answer the question, state what IS covered without padding
+	specific := `
+RESPONSE APPROACH:
+- Give a direct answer using only the provided information
+- Include key details that are explicitly stated in the context
+- If you have the core information needed, answer confidently
+- If critical details are missing, say "Check the [specific section] for more details on [topic]"
 
-STRUCTURE:
-- **Direct Answer**: Clear, immediate response to the question
-- **Key Details**: Specific rules or mechanics (use paragraphs for explanations, bullets only for lists)
-- **Context** (if needed): Brief related information
-- **Practical Note**: How this applies in gameplay`
+Focus on answering the specific question asked without unnecessary elaboration.`
 
-	return fmt.Sprintf(common,
-		"Answer the specific question asked using the provided knowledge base.",
-		"Start with a direct, clear answer to the question") + "\n\n" + specificApproach
+	return base + specific
 }
 
-func (p *StaticTemplate) getBroadQuestionTemplate() string {
-	common := p.getCommonTemplate()
+func (p *StaticTemplate) getStandardTemplate() string {
+	base := p.getBaseTemplate()
 
-	specificApproach := `COMPREHENSIVE RESPONSE STRATEGY:
-• Begin with an overview using only information from the provided context
-• Break down only the components explicitly mentioned in the rules
-• Explain relationships only when they are directly stated
-• Include only examples and cases explicitly mentioned in the context
-• Only mention connections that are directly stated in the rules
+	specific := `
+RESPONSE APPROACH:
+- Start with a clear overview using only information from the provided context
+- Organize information logically using headers when helpful
+- Only explain connections that are explicitly stated in the rulebook
+- Include examples only when they appear in the provided context
+- Cover all relevant aspects found in the context without repetition
 
-STRUCTURE:
-- **Overview**: Brief introduction using only provided information (write as paragraphs)
-- **Core Components**: Only elements explicitly mentioned in the context (use bullets for lists, paragraphs for explanations)
-- **Key Rules**: Only mechanics and restrictions directly stated (write as paragraphs unless listing multiple items)
-- **Examples**: Only scenarios explicitly mentioned in the rules
-- **Related Systems**: Only connections explicitly stated in the context`
+Structure your response to flow naturally, but never add information not present in the provided rules.`
 
-	return fmt.Sprintf(common,
-		"Provide a comprehensive explanation using the provided knowledge base.",
-		"Begin with a clear overview of the system or mechanic") + "\n\n" + specificApproach
+	return base + specific
 }
