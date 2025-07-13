@@ -17,22 +17,17 @@ type TemplateProvider interface {
 }
 
 type BedrockProvider struct {
-	bedrockClient    *aws.BedrockClient
+	bedrockClient    aws.BedrockClient
 	templateProvider TemplateProvider
 	config           *config.Bedrock
 }
 
-func NewBedrockProvider(config *config.Bedrock, templateProvider TemplateProvider) (*BedrockProvider, error) {
-	bedrockClient, err := aws.NewBedrockClient(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Bedrock client: %w", err)
-	}
-
+func NewBedrockProvider(bedrockClient aws.BedrockClient, templateProvider TemplateProvider, config *config.Bedrock) *BedrockProvider {
 	return &BedrockProvider{
 		bedrockClient:    bedrockClient,
 		templateProvider: templateProvider,
 		config:           config,
-	}, nil
+	}
 }
 
 func (b *BedrockProvider) GenerateAnswer(ctx context.Context, request *types.AnswerRequest) (string, error) {

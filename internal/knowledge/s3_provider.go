@@ -6,22 +6,16 @@ import (
 	"strings"
 
 	"github.com/PhilNel/go-boardgame-assistant/internal/aws"
-	"github.com/PhilNel/go-boardgame-assistant/internal/config"
 )
 
 type S3Provider struct {
-	s3Client *aws.S3Client
+	s3Client aws.S3Client
 }
 
-func NewS3Provider(cfg *config.S3) (*S3Provider, error) {
-	s3Client, err := aws.NewS3Client(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create S3 client: %w", err)
-	}
-
+func NewS3Provider(s3Client aws.S3Client) *S3Provider {
 	return &S3Provider{
 		s3Client: s3Client,
-	}, nil
+	}
 }
 
 func (s *S3Provider) GetFiles(ctx context.Context, gameName string) ([]string, error) {

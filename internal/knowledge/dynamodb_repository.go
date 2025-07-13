@@ -6,27 +6,21 @@ import (
 	"log"
 
 	"github.com/PhilNel/go-boardgame-assistant/internal/aws"
-	"github.com/PhilNel/go-boardgame-assistant/internal/config"
 	dynamoTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 type DynamoDBRepository struct {
-	dynamoDB       *aws.DynamoDBClient
+	dynamoDB       aws.DynamoDBClient
 	knowledgeTable string
 }
 
-func NewDynamoDBRepository(cfg *config.DynamoDB) (*DynamoDBRepository, error) {
-	log.Printf("Initializing knowledge repository with dynamoDB table: %s", cfg.KnowledgeTable)
-
-	dynamoDB, err := aws.NewDynamoDBClient(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create DynamoDB client: %w", err)
-	}
+func NewDynamoDBRepository(dynamoClient aws.DynamoDBClient, knowledgeTable string) *DynamoDBRepository {
+	log.Printf("Initializing knowledge repository with dynamoDB table: %s", knowledgeTable)
 
 	return &DynamoDBRepository{
-		dynamoDB:       dynamoDB,
-		knowledgeTable: cfg.KnowledgeTable,
-	}, nil
+		dynamoDB:       dynamoClient,
+		knowledgeTable: knowledgeTable,
+	}
 }
 
 func (r *DynamoDBRepository) SaveKnowledgeChunk(ctx context.Context, chunk *Chunk) error {

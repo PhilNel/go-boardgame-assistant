@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/PhilNel/go-boardgame-assistant/internal/aws"
 	"github.com/PhilNel/go-boardgame-assistant/internal/config"
 	"github.com/PhilNel/go-boardgame-assistant/internal/embedding"
 	"github.com/PhilNel/go-boardgame-assistant/internal/handler"
@@ -24,28 +25,26 @@ func init() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	fileProvider, err := knowledge.NewS3Provider(cfg.S3)
+	s3Client, err := aws.NewS3Client(cfg.S3)
 	if err != nil {
-		log.Fatalf("Failed to initialize file provider: %v", err)
+		log.Fatalf("Failed to create S3 client: %v", err)
 	}
+	fileProvider := knowledge.NewS3Provider(s3Client)
 
-	embeddingProvider, err := embedding.NewBedrockCreator(cfg.Bedrock)
+	bedrockClient, err := aws.NewAWSBedrockClient(cfg.Bedrock)
 	if err != nil {
-		log.Fatalf("Failed to initialize embedding provider: %v", err)
+		log.Fatalf("Failed to create Bedrock client: %v", err)
 	}
+	embeddingProvider := embedding.NewBedrockCreator(bedrockClient)
 
-	knowledgeRepo, err := knowledge.NewDynamoDBRepository(cfg.DynamoDB)
+	dynamoClient, err := aws.NewDynamoDBClient(cfg.DynamoDB)
 	if err != nil {
-		log.Fatalf("Failed to initialize knowledge repository: %v", err)
+		log.Fatalf("Failed to create DynamoDB client: %v", err)
 	}
-
-	statusRepo, err := status.NewDynamoDBRepository(cfg.DynamoDB)
-	if err != nil {
-		log.Fatalf("Failed to initialize status repository: %v", err)
-	}
+	knowledgeRepo := knowledge.NewDynamoDBRepository(dynamoClient, cfg.DynamoDB.KnowledgeTable)
+	statusRepo := status.NewDynamoDBRepository(dynamoClient, cfg.DynamoDB.JobsTable)
 
 	processor := knowledge.NewProcessor(fileProvider, embeddingProvider, knowledgeRepo, statusRepo, cfg.RAG)
-
 	processingHandler = handler.NewProcessingHandler(processor)
 
 	log.Printf("Knowledge Processor Lambda initialized successfully")

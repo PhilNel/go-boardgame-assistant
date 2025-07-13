@@ -7,28 +7,22 @@ import (
 	"time"
 
 	"github.com/PhilNel/go-boardgame-assistant/internal/aws"
-	"github.com/PhilNel/go-boardgame-assistant/internal/config"
 	dynamoTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
 )
 
 type DynamoDBRepository struct {
-	dynamoDB  *aws.DynamoDBClient
+	dynamoDB  aws.DynamoDBClient
 	jobsTable string
 }
 
-func NewDynamoDBRepository(cfg *config.DynamoDB) (*DynamoDBRepository, error) {
-	log.Printf("Initializing status repository with dynamoDB table: %s", cfg.JobsTable)
-
-	dynamoDB, err := aws.NewDynamoDBClient(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create DynamoDB client: %w", err)
-	}
+func NewDynamoDBRepository(dynamoClient aws.DynamoDBClient, jobsTable string) *DynamoDBRepository {
+	log.Printf("Initializing status repository with dynamoDB table: %s", jobsTable)
 
 	return &DynamoDBRepository{
-		dynamoDB:  dynamoDB,
-		jobsTable: cfg.JobsTable,
-	}, nil
+		dynamoDB:  dynamoClient,
+		jobsTable: jobsTable,
+	}
 }
 
 func (r *DynamoDBRepository) CreateProcessingJob(ctx context.Context, gameName string, totalFiles int) (string, error) {

@@ -12,13 +12,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 )
 
-type BedrockClient struct {
+type AWSBedrockClient struct {
 	client           *bedrockruntime.Client
 	modelID          string
 	embeddingModelID string
 }
 
-func NewBedrockClient(config *config.Bedrock) (*BedrockClient, error) {
+func NewAWSBedrockClient(config *config.Bedrock) (*AWSBedrockClient, error) {
 	ctx := context.Background()
 
 	log.Printf("Initializing Bedrock client with region: %s, model: %s, embedding model: %s",
@@ -31,14 +31,14 @@ func NewBedrockClient(config *config.Bedrock) (*BedrockClient, error) {
 
 	client := bedrockruntime.NewFromConfig(awsCfg)
 
-	return &BedrockClient{
+	return &AWSBedrockClient{
 		client:           client,
 		modelID:          config.ModelID,
 		embeddingModelID: config.EmbeddingModelID,
 	}, nil
 }
 
-func (b *BedrockClient) InvokeModel(ctx context.Context, request *BedrockRequest) (*BedrockResponse, error) {
+func (b *AWSBedrockClient) InvokeModel(ctx context.Context, request *BedrockRequest) (*BedrockResponse, error) {
 	requestBody, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -63,7 +63,7 @@ func (b *BedrockClient) InvokeModel(ctx context.Context, request *BedrockRequest
 	return &response, nil
 }
 
-func (b *BedrockClient) InvokeEmbeddingModel(ctx context.Context, requestBody []byte) ([]byte, error) {
+func (b *AWSBedrockClient) InvokeEmbeddingModel(ctx context.Context, requestBody []byte) ([]byte, error) {
 	input := &bedrockruntime.InvokeModelInput{
 		ModelId:     aws.String(b.embeddingModelID),
 		ContentType: aws.String("application/json"),
@@ -78,10 +78,10 @@ func (b *BedrockClient) InvokeEmbeddingModel(ctx context.Context, requestBody []
 	return result.Body, nil
 }
 
-func (b *BedrockClient) GetModelID() string {
+func (b *AWSBedrockClient) GetModelID() string {
 	return b.modelID
 }
 
-func (b *BedrockClient) GetEmbeddingModelID() string {
+func (b *AWSBedrockClient) GetEmbeddingModelID() string {
 	return b.embeddingModelID
 }

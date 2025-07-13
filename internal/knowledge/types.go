@@ -1,5 +1,7 @@
 package knowledge
 
+import "context"
+
 type Chunk struct {
 	ID         string    `json:"id" dynamodbav:"chunk_id"`
 	GameName   string    `json:"game_name" dynamodbav:"game_name"`
@@ -22,4 +24,35 @@ type SearchRequest struct {
 type SearchResult struct {
 	Chunk      *Chunk  `json:"chunk"`
 	Similarity float64 `json:"similarity"`
+}
+
+type KnowledgeRepository interface {
+	SaveKnowledgeChunk(ctx context.Context, chunk *Chunk) error
+	GetKnowledgeChunksByGame(ctx context.Context, gameName string) ([]*Chunk, error)
+	BatchSaveKnowledgeChunks(ctx context.Context, chunks []*Chunk) error
+}
+
+type FileProvider interface {
+	GetFiles(ctx context.Context, gameName string) ([]string, error)
+	GetFileContent(ctx context.Context, filePath string) ([]byte, error)
+}
+
+type EmbeddingProvider interface {
+	CreateEmbedding(ctx context.Context, text string) ([]float64, error)
+}
+
+type StatusRepository interface {
+	CreateProcessingJob(ctx context.Context, gameName string, totalFiles int) (string, error)
+	UpdateJobProgress(ctx context.Context, jobID string, progress int) error
+	CompleteJob(ctx context.Context, jobID string, gameName string, processed, total int) error
+	FailJob(ctx context.Context, jobID string, gameName string, errorMsg string) error
+}
+
+type ProcessingResult struct {
+	JobID     string `json:"job_id"`
+	GameName  string `json:"game_name"`
+	Status    string `json:"status"`
+	Message   string `json:"message"`
+	Processed int    `json:"processed"`
+	Total     int    `json:"total"`
 }
