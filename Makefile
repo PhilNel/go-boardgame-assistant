@@ -1,12 +1,14 @@
 # Project settings
 LAMBDA_CMD_DIR=cmd/question-handler
 PROCESSOR_CMD_DIR=cmd/knowledge-processor
+FEEDBACK_CMD_DIR=cmd/feedback-handler
 
 BUCKET_NAME := boardgame-assistant-artefacts-dev-eu-west-1
 
 # Lambda settings
 RULES_ASSISTANT_LAMBDA_NAME := go-boardgame-rules-assistant
 PROCESSOR_RULES_ASSISTANT_LAMBDA_NAME := go-boardgame-knowledge-processor
+FEEDBACK_LAMBDA_NAME := go-boardgame-feedback-handler
 
 BINARY_NAME := bootstrap
 
@@ -18,6 +20,10 @@ run:
 run-processor:
 	go run $(PROCESSOR_CMD_DIR)/main.go
 
+.PHONY: run-feedback
+run-feedback:
+	go run $(FEEDBACK_CMD_DIR)/main.go
+
 .PHONY: build
 build:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BINARY_NAME) ./$(LAMBDA_CMD_DIR)
@@ -25,6 +31,10 @@ build:
 .PHONY: build-processor
 build-processor:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BINARY_NAME) ./$(PROCESSOR_CMD_DIR)
+
+.PHONY: build-feedback
+build-feedback:
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BINARY_NAME) ./$(FEEDBACK_CMD_DIR)
 
 .PHONY: vendor
 vendor:
@@ -51,6 +61,10 @@ package: build
 package-processor: build-processor
 	zip -j $(PROCESSOR_LAMBDA_NAME).zip $(BINARY_NAME)
 
+.PHONY: package-feedback
+package-feedback: build-feedback
+	zip -j $(FEEDBACK_LAMBDA_NAME).zip $(BINARY_NAME)
+
 .PHONY: upload
 upload:
 	aws s3 cp $(RULES_ASSISTANT_LAMBDA_NAME).zip s3://$(BUCKET_NAME)/$(RULES_ASSISTANT_LAMBDA_NAME).zip
@@ -59,13 +73,20 @@ upload:
 upload-processor:
 	aws s3 cp $(PROCESSOR_LAMBDA_NAME).zip s3://$(BUCKET_NAME)/$(PROCESSOR_LAMBDA_NAME).zip
 
+.PHONY: upload-feedback
+upload-feedback:
+	aws s3 cp $(FEEDBACK_LAMBDA_NAME).zip s3://$(BUCKET_NAME)/$(FEEDBACK_LAMBDA_NAME).zip
+
 .PHONY: deploy
 deploy: package upload
 
 .PHONY: deploy-processor
 deploy-processor: package-processor upload-processor
 
+.PHONY: deploy-feedback
+deploy-feedback: package-feedback upload-feedback
+
 .PHONY: clean
 clean:
 	@echo "🧹 Cleaning up..."
-	rm -f $(BINARY_NAME) $(RULES_ASSISTANT_LAMBDA_NAME).zip $(PROCESSOR_LAMBDA_NAME).zip 
+	rm -f $(BINARY_NAME) $(RULES_ASSISTANT_LAMBDA_NAME).zip $(PROCESSOR_LAMBDA_NAME).zip $(FEEDBACK_LAMBDA_NAME).zip 
