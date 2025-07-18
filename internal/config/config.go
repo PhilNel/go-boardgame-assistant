@@ -40,6 +40,7 @@ type S3 struct {
 type DynamoDB struct {
 	KnowledgeTable string `long:"knowledge_table" env:"KNOWLEDGE_TABLE_NAME" description:"DynamoDB table for knowledge chunks"`
 	JobsTable      string `long:"jobs_table" env:"JOBS_TABLE_NAME" description:"DynamoDB table for processing jobs"`
+	FeedbackTable  string `long:"feedback_table" env:"FEEDBACK_TABLE_NAME" description:"DynamoDB table for feedback submissions"`
 	Region         string `long:"aws_region_dynamodb" env:"AWS_REGION" description:"AWS region to use" default:"eu-west-1"`
 }
 
