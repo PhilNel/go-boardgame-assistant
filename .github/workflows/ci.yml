@@ -14,7 +14,26 @@ jobs:
     name: Run Tests
     uses: PhilNel/shared-go-workflows/.github/workflows/test.yml@main
 
-  build:
-    name: Build Binary
+  build-question-handler:
+    name: Build Question Handler
     needs: [lint]
     uses: PhilNel/shared-go-workflows/.github/workflows/build.yml@main
+    with:
+      build-cmd-dir: cmd/question-handler
+      binary-name: go-boardgame-question-handler
+
+  build-knowledge-processor:
+    name: Build Knowledge Processor
+    needs: [lint]
+    uses: PhilNel/shared-go-workflows/.github/workflows/build.yml@main
+    with:
+      build-cmd-dir: cmd/knowledge-processor
+      binary-name: go-boardgame-knowledge-processor
+
+  build-feedback-handler:
+    name: Build Feedback Handler
+    needs: [lint]
+    uses: PhilNel/shared-go-workflows/.github/workflows/build.yml@main
+    with:
+      build-cmd-dir: cmd/feedback-handler
+      binary-name: go-boardgame-feedback-handler
