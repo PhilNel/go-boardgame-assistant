@@ -8,6 +8,7 @@ import (
 
 type DynamoDBClient interface {
 	PutItem(ctx context.Context, tableName string, item interface{}) error
+	GetItem(ctx context.Context, tableName string, key map[string]types.AttributeValue, result interface{}) error
 	Query(ctx context.Context, tableName string, indexName *string, keyCondition string, expressionAttributeValues map[string]types.AttributeValue, result interface{}) error
 	BatchWriteItems(ctx context.Context, tableName string, items []interface{}) error
 	UpdateItem(ctx context.Context, tableName string, key map[string]types.AttributeValue, updateExpression string, expressionValues map[string]types.AttributeValue) error
