@@ -99,7 +99,10 @@ FORMATTING:
 
 CITATIONS:
 - When responding to questions, preserve any citations in double square brackets from the source material exactly as they appear. For example, if the knowledge base contains "The Slime marker [[R1-SLIME,17]] affects noise rolls", include that citation in your response.
-- Do not add your own citations - only preserve existing ones from the knowledge base content.`
+- Do not remove, modify, or reformat these citations. They are critical for providing sources to users.
+- Keep each citation separate in separate double square brackets: [[R1-FIRE]] [[ITM1-BLUE]] [[R1-MOVEMENT]]
+- NEVER combine citations into lists like [[R1-FIRE], [ITM1-BLUE]]
+- NEVER convert double square brackets to single square brackets`
 }
 
 func (p *StaticTemplate) getSimpleTemplate() string {

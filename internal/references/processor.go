@@ -21,8 +21,8 @@ func NewReferenceProcessor(referenceRepo ReferenceRepository) *ReferenceProcesso
 	}
 }
 
-func (p *ReferenceProcessor) ProcessCitations(ctx context.Context, gameID, responseText string) (*ProcessedResponse, error) {
-	log.Printf("Processing citations for game: %s, text length: %d", gameID, len(responseText))
+func (p *ReferenceProcessor) Process(ctx context.Context, gameID, responseText string) (*ProcessedResponse, error) {
+	log.Printf("Processing references for game: %s, text length: %d", gameID, len(responseText))
 
 	citations, err := p.extractCitations(responseText)
 	if err != nil {
@@ -100,7 +100,6 @@ func (p *ReferenceProcessor) buildFootnoteMapping(ctx context.Context, gameID st
 	var references []*ReferenceInfo
 	footnoteCounter := 1
 
-	// Track unique reference IDs to avoid duplicate footnotes
 	seenReferences := make(map[string]bool)
 
 	for _, citation := range citations {
@@ -109,7 +108,6 @@ func (p *ReferenceProcessor) buildFootnoteMapping(ctx context.Context, gameID st
 			citationKey += "," + citation.Page
 		}
 
-		// Skip if we've already processed this exact citation
 		if seenReferences[citationKey] {
 			continue
 		}
@@ -122,37 +120,45 @@ func (p *ReferenceProcessor) buildFootnoteMapping(ctx context.Context, gameID st
 		}
 
 		reference, err := p.referenceRepo.GetReference(ctx, gameID, citation.ReferenceID)
+		var referenceToAppend *ReferenceInfo
 		if err != nil {
 			log.Printf("WARNING: Failed to lookup reference %s: %v", citation.ReferenceID, err)
-			// Create a placeholder reference for missing ones
-			references = append(references, &ReferenceInfo{
-				ID:      footnoteCounter,
-				Title:   "[Reference not found]",
-				Section: "",
-				Page:    citation.Page,
-				URL:     "",
-			})
+			referenceToAppend = p.createPlaceholderReference(footnoteCounter, citation.Page)
 		} else {
-			// Build page reference
-			pageRef := reference.PageReference
-			if citation.Page != "" {
-				pageRef = fmt.Sprintf("p.%s", citation.Page)
-			}
-
-			references = append(references, &ReferenceInfo{
-				ID:      footnoteCounter,
-				Title:   reference.Title,
-				Section: reference.Section,
-				Page:    pageRef,
-				URL:     reference.URL,
-			})
+			referenceToAppend = p.createPageReference(footnoteCounter, reference, citation.Page)
 		}
+		references = append(references, referenceToAppend)
 
 		seenReferences[citationKey] = true
 		footnoteCounter++
 	}
 
 	return footnoteMap, references, nil
+}
+
+func (p *ReferenceProcessor) createPlaceholderReference(footnoteCounter int, page string) *ReferenceInfo {
+	return &ReferenceInfo{
+		ID:      footnoteCounter,
+		Title:   "[Reference not found]",
+		Section: "",
+		Page:    page,
+		URL:     "",
+	}
+}
+
+func (p *ReferenceProcessor) createPageReference(footnoteCounter int, reference *Reference, page string) *ReferenceInfo {
+	pageRef := reference.PageReference
+	if page != "" {
+		pageRef = fmt.Sprintf("p.%s", page)
+	}
+
+	return &ReferenceInfo{
+		ID:      footnoteCounter,
+		Title:   reference.Title,
+		Section: reference.Section,
+		Page:    pageRef,
+		URL:     reference.URL,
+	}
 }
 
 func (p *ReferenceProcessor) replaceCitationsWithFootnotes(text string, citations []*Citation, footnoteMap map[string]string) string {

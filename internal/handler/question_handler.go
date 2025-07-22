@@ -110,7 +110,7 @@ func (h *QuestionHandler) processQuestion(ctx context.Context, req *Request) (*R
 		return nil, fmt.Errorf("failed to generate response: %w", err)
 	}
 
-	processedResponse, err := h.referenceProcessor.ProcessCitations(ctx, req.GameName, answer)
+	processedResponse, err := h.referenceProcessor.Process(ctx, req.GameName, answer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process references: %w", err)
 	}

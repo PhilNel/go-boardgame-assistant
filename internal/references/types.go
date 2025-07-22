@@ -38,5 +38,5 @@ type ReferenceRepository interface {
 }
 
 type Processor interface {
-	ProcessCitations(ctx context.Context, gameID, responseText string) (*ProcessedResponse, error)
+	Process(ctx context.Context, gameID, responseText string) (*ProcessedResponse, error)
 }
