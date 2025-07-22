@@ -8,6 +8,7 @@ import (
 
 	"github.com/PhilNel/go-boardgame-assistant/internal/knowledge"
 	"github.com/PhilNel/go-boardgame-assistant/internal/logger"
+	"github.com/PhilNel/go-boardgame-assistant/internal/references"
 	"github.com/PhilNel/go-boardgame-assistant/internal/types"
 	"github.com/PhilNel/go-boardgame-assistant/internal/utils"
 	"github.com/aws/aws-lambda-go/events"
@@ -19,8 +20,9 @@ type Request struct {
 }
 
 type Response struct {
-	Answer string `json:"answer"`
-	Error  string `json:"error,omitempty"`
+	Answer     string                      `json:"answer"`
+	References []*references.ReferenceInfo `json:"references,omitempty"`
+	Error      string                      `json:"error,omitempty"`
 }
 
 type KnowledgeProvider interface {
@@ -32,14 +34,16 @@ type AnswerProvider interface {
 }
 
 type QuestionHandler struct {
-	knowledgeProvider KnowledgeProvider
-	answerProvider    AnswerProvider
+	knowledgeProvider  KnowledgeProvider
+	answerProvider     AnswerProvider
+	referenceProcessor references.Processor
 }
 
-func NewQuestionHandler(knowledgeProvider KnowledgeProvider, answerProvider AnswerProvider) *QuestionHandler {
+func NewQuestionHandler(knowledgeProvider KnowledgeProvider, answerProvider AnswerProvider, referenceProcessor references.Processor) *QuestionHandler {
 	return &QuestionHandler{
-		knowledgeProvider: knowledgeProvider,
-		answerProvider:    answerProvider,
+		knowledgeProvider:  knowledgeProvider,
+		answerProvider:     answerProvider,
+		referenceProcessor: referenceProcessor,
 	}
 }
 
@@ -49,12 +53,11 @@ func (h *QuestionHandler) Handle(ctx context.Context, request events.APIGatewayP
 		return utils.CreateErrorResponse(400, err.Error()), nil
 	}
 
-	answer, err := h.processQuestion(ctx, req)
+	response, err := h.processQuestion(ctx, req)
 	if err != nil {
 		return utils.CreateErrorResponse(500, err.Error()), nil
 	}
 
-	response := Response{Answer: answer}
 	return utils.CreateSuccessResponse(response)
 }
 
@@ -81,20 +84,19 @@ func (h *QuestionHandler) validateRequest(req *Request) error {
 	return nil
 }
 
-func (h *QuestionHandler) processQuestion(ctx context.Context, req *Request) (string, error) {
+func (h *QuestionHandler) processQuestion(ctx context.Context, req *Request) (*Response, error) {
 	logger.LogIncomingRequest(req.GameName, req.Question)
 
 	knowledgeContent, err := h.knowledgeProvider.GetKnowledge(ctx, req.GameName, req.Question)
 	if err != nil {
-		// Check if this is a "no relevant knowledge" error
 		var noKnowledgeErr *knowledge.NoRelevantKnowledgeError
 		if errors.As(err, &noKnowledgeErr) {
-			// Return a helpful message instead of an error
-			return "I don't have any specific information about that topic in my knowledge base for " + req.GameName +
+			answer := "I don't have any specific information about that topic in my knowledge base for " + req.GameName +
 				". This might be something we haven't covered yet, or your question might need to be more specific. " +
-				"Feel free to try rephrasing your question or asking about a different aspect of the game!", nil
+				"Feel free to try rephrasing your question or asking about a different aspect of the game!"
+			return &Response{Answer: answer}, nil
 		}
-		return "", fmt.Errorf("failed to retrieve game knowledge: %w", err)
+		return nil, fmt.Errorf("failed to retrieve game knowledge: %w", err)
 	}
 
 	answerRequest := &types.AnswerRequest{
@@ -105,10 +107,19 @@ func (h *QuestionHandler) processQuestion(ctx context.Context, req *Request) (st
 
 	answer, err := h.answerProvider.GenerateAnswer(ctx, answerRequest)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate response: %w", err)
+		return nil, fmt.Errorf("failed to generate response: %w", err)
 	}
 
-	logger.LogSuccessfulQAPair(req.GameName, req.Question, answer)
+	processedResponse, err := h.referenceProcessor.Process(ctx, req.GameName, answer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process references: %w", err)
+	}
 
-	return answer, nil
+	response := &Response{
+		Answer:     processedResponse.Response,
+		References: processedResponse.References,
+	}
+
+	logger.LogSuccessfulQAPair(req.GameName, req.Question, processedResponse.Response)
+	return response, nil
 }

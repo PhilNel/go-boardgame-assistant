@@ -11,6 +11,7 @@ import (
 	"github.com/PhilNel/go-boardgame-assistant/internal/handler"
 	"github.com/PhilNel/go-boardgame-assistant/internal/knowledge"
 	"github.com/PhilNel/go-boardgame-assistant/internal/prompt"
+	"github.com/PhilNel/go-boardgame-assistant/internal/references"
 	"github.com/PhilNel/go-boardgame-assistant/internal/utils"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -41,9 +42,14 @@ func init() {
 
 	templateProvider := prompt.NewStaticTemplate()
 
+	referencesRepo := references.NewDynamoDBRepository(dynamoClient, cfg.DynamoDB.ReferencesTable)
+	referenceProcessor := references.NewReferenceProcessor(referencesRepo)
+
 	answerProvider := answer.NewBedrockProvider(bedrockClient, templateProvider, cfg.Bedrock)
 	knowledgeProvider := knowledge.NewVectorProvider(knowledgeRepo, embeddingProvider, cfg.RAG)
-	questionHandler = handler.NewQuestionHandler(knowledgeProvider, answerProvider)
+	questionHandler = handler.NewQuestionHandler(knowledgeProvider, answerProvider, referenceProcessor)
+
+	log.Printf("Lambda initialized successfully with references support")
 }
 
 func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
