@@ -5,14 +5,18 @@ This repository contains the Lambda functions for the Board Game Assistant proje
 ## Lambda Functions
 
 ### 1. Knowledge Processor (`knowledge-processor`)
+
 This Lambda function processes and indexes board game rules from markdown files stored in S3.
+
 - Reads game rule files from S3 storage
 - Generates embeddings using AWS Bedrock
 - Stores the processed knowledge chunks with embeddings in DynamoDB
 - Tracks processing status for each game
 
 ### 2. Question Handler (`question-handler`)
+
 This Lambda function serves as the main API backend for answering questions about board game rules.
+
 - Receives user questions about specific board games
 - Performs hybrid search using vector similarity and TFIDF scoring to find relevant rule sections
 - Uses AWS Bedrock and Claude to generate contextual answers
@@ -20,7 +24,9 @@ This Lambda function serves as the main API backend for answering questions abou
 - Returns natural language responses based on the game's rules
 
 ### 3. Feedback Handler (`feedback-handler`)
+
 This Lambda function captures user feedback to improve answer quality and system performance.
+
 - Stores user ratings and issue reports for each response
 - Tracks conversation context to understand user intent
 - Enables improvement of prompt engineering and knowledge retrieval
@@ -34,11 +40,13 @@ This Lambda function captures user feedback to improve answer quality and system
 ## Development
 
 1. Install dependencies:
+
    ```bash
    make vendor
    ```
 
 2. Each Lambda has a separate `build` command. For example, the `knowledge-processor` Lambda can be built using:
+
    ```bash
    make build-processor
    ```
@@ -54,5 +62,7 @@ This Lambda function captures user feedback to improve answer quality and system
 - [`knowledge-boardgame-assistant`](https://github.com/PhilNel/knowledge-boardgame-assistant) - Collection of structured board game rules in markdown format that forms the knowledge base for this project.
 
 - [`infra-boardgame-assistant`](https://github.com/PhilNel/infra-boardgame-assistant) - Terraform configuration for deploying the infrastructure and managing Lambda permissions, S3 buckets, etc.
+
+- [`pulumi-boardgame-assistant`](https://github.com/PhilNel/pulumi-boardgame-assistant) - Pulumi repository for adding references/citations used by by knowledge base.
 
 - [`vue-boardgame-assistant`](https://github.com/PhilNel/vue-boardgame-assistant) - The frontend Vue website that is used to interact with the Board Game Assistant functionality.
